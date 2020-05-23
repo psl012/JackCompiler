@@ -87,7 +87,7 @@ class JackCompiler:
 
         # } <symbol> } </symbol>
         self.advance()
-        self.jack_array.append(self.current_token)
+        self.jack_array.append(' ' * sc + self.current_token)
 
         self.jack_array.append('</class>')
         # end of Class --------------------------------------------------------------------
@@ -176,6 +176,64 @@ class JackCompiler:
         self.jack_array.append(' ' * c_sc + '</subroutineDec>')  # </subroutineDec>
         # End of Subroutine Dec------------------------------------------------
 
+    def compile_parameter_list(self, c_sc):
+        self.jack_array.append(' ' * c_sc + '<parameterList>')  # <parameterList>
+        is_comma = False    # Initialize for the while loop (different structure than standard)
+
+        # Type or None at all: Initial
+        if self.check_multiple(0, '<keyword> int </keyword>', '<keyword> char </keyword>',
+                               '<keyword> boolean </keyword>') or self.is_token_class():
+            is_void = False
+            self.jack_array.append(self.current_token)
+            is_comma = self.check_next('<symbol> , </symbol>')
+            self.check_insert_comma(is_comma)   # , : '<symbol> , </symbol>'
+
+        else:
+            is_void = True
+
+        while is_comma:
+            # Type: '<keyword> int </keyword>', '<keyword> char </keyword>','<keyword> boolean </keyword>',
+            #           self.class_name
+            self.advance()
+            self.jack_array.append(self.current_token)
+            is_comma = self.check_next('<symbol> , </symbol>')
+            self.check_insert_comma(is_comma)   # , : '<symbol> , </symbol>'
+
+        # End of ParameterList: </parameterList>
+        self.jack_array.append(' ' * c_sc + '</parameterList>')
+
+        return is_void
+        # End of ParameterList-------------------------------------------------------------
+
+    def compile_var_dec(self, c_sc):
+        self.jack_array.append(' ' * c_sc + '<varDec>')  # <varDec>
+        sc = c_sc + 2
+
+        # 'var': <keyword> var </keyword>
+        self.jack_array.append(' ' * sc + self.current_token)
+
+        # type : <identifier> SquareGame </identifier>
+        self.advance()
+        self.jack_array.append(' ' * sc + self.current_token)
+        # if the type is an identifier it is a className: Update className array
+        self.class_names.append(self.current_token)
+
+        # varName: <identifier> game </identifier>
+        is_comma = True
+        while is_comma:
+            self.advance()
+            self.jack_array.append(' ' * sc + self.current_token)
+            self.var_names.append(self.current_token)
+            is_comma = self.check_next('<symbol> , </symbol>')
+            self.check_insert_comma(is_comma, sc)   # , : '<symbol> , </symbol>'
+
+        # ; <symbol> ; </symbol>
+        self.advance()
+        self.jack_array.append(' ' * sc + self.current_token)
+
+        self.jack_array.append(' ' * c_sc + '</varDec>')  # </varDec>
+        # end of var-dec-------------------------------------------------------------
+
     # this is put top because this is confusing as hell
     def compile_statements(self, c_sc):
         self.jack_array.append(' ' * c_sc + '<statements>')  # <Statements>
@@ -210,6 +268,47 @@ class JackCompiler:
         # Check if the statement is an if statement
         elif self.current_token == '<keyword> if </keyword>':
             self.compile_if_statement(c_sc)
+
+    def compile_let_statement(self, c_sc):
+        self.jack_array.append(' ' * c_sc + '<letStatement>')  # <Statements: letStatement>
+        sc = c_sc + 2
+
+        # 'let': '<keyword> let </keyword>'
+        self.jack_array.append(' ' * sc + self.current_token)
+
+        # varName
+        self.advance()
+        self.jack_array.append(' ' * sc + self.current_token)
+
+        # check if it has [expression]--------------------------------
+        if self.check_next("<symbol> [ </symbol>"):
+            # [ : <symbol> [ </symbol>
+            self.advance()
+            self.jack_array.append(' ' * sc + self.current_token)
+
+            # Expression
+            self.advance()
+            self.compile_expression(sc)
+
+            # ] : <symbol> ] </symbol>
+            self.advance()
+            self.jack_array.append(' ' * sc + self.current_token)
+        # -------------------------------------------------------------
+
+        # = : <symbol> = </symbol>
+        self.advance()
+        self.jack_array.append(' ' * sc + self.current_token)
+
+        # expression
+        self.advance()
+        self.compile_expression(sc)
+
+        # ; : <symbol> ; </symbol>
+        self.advance()
+        self.jack_array.append(' ' * sc + self.current_token)
+
+        self.jack_array.append(' ' * c_sc + '</letStatement>')  # <Statements>
+        # end of Let Statement-----------------------------------
 
     def compile_if_statement(self, c_sc=0):
         self.jack_array.append(' ' * c_sc + '<ifStatement>')  # <Statements: ifStatement>
@@ -263,25 +362,6 @@ class JackCompiler:
 
         # end of ifStatement----------------------------------------------
 
-    def compile_return_statement(self, c_sc=0):
-        self.jack_array.append(' ' * c_sc + '<returnStatement>')  # <Statements: returnStatement>
-        sc = c_sc + 2
-
-        # return: <keyword> return </keyword>
-        self.jack_array.append(' ' * sc + self.current_token)
-
-        # Expression: <Expression> ____ </Expression>
-        if not self.check_next('<symbol> ; </symbol>'):
-            self.advance()
-            print("Fill this up later!")
-
-        # ; <symbol> ; </symbol>'
-        self.advance()
-        self.jack_array.append(' ' * sc + self.current_token)
-
-        self.jack_array.append(' ' * c_sc + '</returnStatement>')  # </Statements: /returnStatement>
-        # End of return Statement---------------------------------------
-
     def compile_do_statement(self, c_sc=0):
         self.jack_array.append(' ' * c_sc + '<doStatement>')  # <Statements: doStatement>
         sc = c_sc + 2
@@ -300,46 +380,24 @@ class JackCompiler:
         self.jack_array.append(' ' * c_sc + '</doStatement>')  # <Statements: doStatement>
         # End of do_statement------------------------------------------------
 
-    def compile_let_statement(self, c_sc):
-        self.jack_array.append(' ' * c_sc + '<letStatement>')  # <Statements: letStatement>
+    def compile_return_statement(self, c_sc=0):
+        self.jack_array.append(' ' * c_sc + '<returnStatement>')  # <Statements: returnStatement>
         sc = c_sc + 2
 
-        # 'let': '<keyword> let </keyword>'
+        # return: <keyword> return </keyword>
         self.jack_array.append(' ' * sc + self.current_token)
 
-        # varName
-        self.advance()
-        self.jack_array.append(' ' * sc + self.current_token)
-
-        # check if it has [expression]--------------------------------
-        if self.check_next("<symbol> [ </symbol>"):
-            # [ : <symbol> [ </symbol>
+        # Expression: <Expression> ____ </Expression>
+        if not self.check_next('<symbol> ; </symbol>'):
             self.advance()
-            self.jack_array.append(' ' * sc + self.current_token)
+            print("Fill this up later!")
 
-            # Expression
-            self.advance()
-            self.compile_expression(sc)
-
-            # ] : <symbol> ] </symbol>
-            self.advance()
-            self.jack_array.append(' ' * sc + self.current_token)
-        # -------------------------------------------------------------
-
-        # = : <symbol> = </symbol>
+        # ; <symbol> ; </symbol>'
         self.advance()
         self.jack_array.append(' ' * sc + self.current_token)
 
-        # expression
-        self.advance()
-        self.compile_expression(sc)
-
-        # ; : <symbol> ; </symbol>
-        self.advance()
-        self.jack_array.append(' ' * sc + self.current_token)
-
-        self.jack_array.append(' ' * c_sc + '</letStatement>')  # <Statements>
-        # end of Let Statement-----------------------------------
+        self.jack_array.append(' ' * c_sc + '</returnStatement>')  # </Statements: /returnStatement>
+        # End of return Statement---------------------------------------
 
     def compile_expression(self, c_sc):
         self.jack_array.append(' ' * c_sc + '<expression>')  # <Expression>
@@ -478,63 +536,19 @@ class JackCompiler:
         self.jack_array.append(' ' * c_sc + '</expressionList>')  # </expressionList>
         # End of Expression List-----------------------------------------------------------
 
-    def compile_parameter_list(self, c_sc):
-        self.jack_array.append(' ' * c_sc + '<parameterList>')  # <parameterList>
-        is_comma = False    # Initialize for the while loop (different structure than standard)
+    def is_token_class(self):
+        for class_name in self.class_names:
+            if self.current_token == class_name:
+                return True
 
-        # Type or None at all: Initial
-        if self.check_multiple(0, '<keyword> int </keyword>', '<keyword> char </keyword>',
-                               '<keyword> boolean </keyword>') or self.is_token_class():
-            is_void = False
-            self.jack_array.append(self.current_token)
-            is_comma = self.check_next('<symbol> , </symbol>')
-            self.check_insert_comma(is_comma)   # , : '<symbol> , </symbol>'
+        return False
 
-        else:
-            is_void = True
+    def is_token_var(self):
+        for var_name in self.var_names:
+            if self.current_token == var_name:
+                return True
 
-        while is_comma:
-            # Type: '<keyword> int </keyword>', '<keyword> char </keyword>','<keyword> boolean </keyword>',
-            #           self.class_name
-            self.advance()
-            self.jack_array.append(self.current_token)
-            is_comma = self.check_next('<symbol> , </symbol>')
-            self.check_insert_comma(is_comma)   # , : '<symbol> , </symbol>'
-
-        # End of ParameterList: </parameterList>
-        self.jack_array.append(' ' * c_sc + '</parameterList>')
-
-        return is_void
-        # End of ParameterList-------------------------------------------------------------
-
-    def compile_var_dec(self, c_sc):
-        self.jack_array.append(' ' * c_sc + '<varDec>')  # <varDec>
-        sc = c_sc + 2
-
-        # 'var': <keyword> var </keyword>
-        self.jack_array.append(' ' * sc + self.current_token)
-
-        # type : <identifier> SquareGame </identifier>
-        self.advance()
-        self.jack_array.append(' ' * sc + self.current_token)
-        # if the type is an identifier it is a className: Update className array
-        self.class_names.append(self.current_token)
-
-        # varName: <identifier> game </identifier>
-        is_comma = True
-        while is_comma:
-            self.advance()
-            self.jack_array.append(' ' * sc + self.current_token)
-            self.var_names.append(self.current_token)
-            is_comma = self.check_next('<symbol> , </symbol>')
-            self.check_insert_comma(is_comma, sc)   # , : '<symbol> , </symbol>'
-
-        # ; <symbol> ; </symbol>
-        self.advance()
-        self.jack_array.append(' ' * sc + self.current_token)
-
-        self.jack_array.append(' ' * c_sc + '</varDec>')  # </varDec>
-        # end of var-dec-------------------------------------------------------------
+        return False
 
     def check_next(self, *f_tokens):
         if self.has_more_tokens():
@@ -555,20 +569,6 @@ class JackCompiler:
         if is_comma:
             self.advance()
             self.jack_array.append(' ' * c_sc +  self.current_token)
-
-    def is_token_class(self):
-        for class_name in self.class_names:
-            if self.current_token == class_name:
-                return True
-
-        return False
-
-    def is_token_var(self):
-        for var_name in self.var_names:
-            if self.current_token == var_name:
-                return True
-
-        return False
 
     def get_jack_file(self):
         return self.jack_array
@@ -595,6 +595,3 @@ for token in test_array:
     print(token)
 
 jack_array.make_jack_file('MainTest')
-
-
-#print(jack_array.advance().compile_class().get_jack_file())
