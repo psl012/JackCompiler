@@ -79,8 +79,8 @@ class JackCompiler:
             self.compile_class_var_dec(sc)
 
         # subroutineDec: <subroutineDec> some words </subroutineDec> THIS CAN REPEAT
-        while self.check_token(1, '<keyword> construction </keyword>', '<keyword> function </keyword>',
-                                '<keyword> method </keyword>'):
+        while self.check_token(1, '<keyword> constructor </keyword>', '<keyword> function </keyword>',
+                               '<keyword> method </keyword>'):
             self.advance()
             self.compile_subroutine(sc)
 
@@ -269,7 +269,8 @@ class JackCompiler:
 
         # Recursion: statements*
         while self.check_token(1, '<keyword> let </keyword>', '<keyword> do </keyword>',
-                                  '<keyword> return </keyword>', '<keyword> if </keyword>'):
+                                  '<keyword> return </keyword>', '<keyword> if </keyword>',
+                               '<keyword> while </keyword>'):
             # Statement type: <____Statement>
             self.advance()
             self.check_statement(sc)
@@ -293,6 +294,10 @@ class JackCompiler:
         # Check if the statement is an if statement
         elif self.current_token == '<keyword> if </keyword>':
             self.compile_if_statement(c_sc)
+
+        # Check if the statement is a while statement
+        elif self.current_token == '<keyword> while </keyword>':
+            self.compile_while_statement(c_sc)
 
     def compile_let_statement(self, c_sc):
         self.jack_array.append(' ' * c_sc + '<letStatement>')  # <Statements: letStatement>
@@ -390,6 +395,40 @@ class JackCompiler:
 
         # end of ifStatement----------------------------------------------
 
+    def compile_while_statement(self, c_sc=0):
+        self.jack_array.append(' ' * c_sc + '<whileStatement>')  # <Statements: whileStatement>
+        sc = c_sc + 2
+
+        # while keyword <keyword> while </keyword>
+        self.jack_array.append(' ' * sc + self.current_token)
+
+        # ( : <symbol> ( </symbol>
+        self.advance()
+        self.jack_array.append(' ' * sc + self.current_token)
+
+        # expression
+        self.advance()
+        self.compile_expression(sc)
+
+        # ) : <symbol> ) </symbol>
+        self.advance()
+        self.jack_array.append(' ' * sc + self.current_token)
+
+        # { : <symbol> { </symbol>
+        self.advance()
+        self.jack_array.append(' ' * sc + self.current_token)
+
+        # statements
+        self.advance()
+        self.compile_statements(sc)
+
+        # } <symbol> } </symbol>
+        self.advance()
+        self.jack_array.append(' ' * sc + self.current_token)
+
+        self.jack_array.append(' ' * c_sc + '</whileStatement>')  # <EndOfStatements: whileStatement>
+        # End of While Statement------------------------------------------------------------------------------
+
     def compile_do_statement(self, c_sc=0):
         self.jack_array.append(' ' * c_sc + '<doStatement>')  # <Statements: doStatement>
         sc = c_sc + 2
@@ -418,7 +457,7 @@ class JackCompiler:
         # Expression: <Expression> ____ </Expression>
         if not self.check_token(1, '<symbol> ; </symbol>'):
             self.advance()
-            print("Fill this up later! LINE 421  compile_return_statement EXPRESSION")
+            self.compile_expression(sc)
 
         # ; <symbol> ; </symbol>'
         self.advance()
@@ -495,8 +534,9 @@ class JackCompiler:
                 self.jack_array.append(' ' * sc + self.current_token)
 
         # the term is a SubroutineCall: Current token is varName or className under SubroutineCall
-        # (className|varName).SubroutineName(expressionList)
-        elif self.is_token_class() or self.is_token_var():
+        # (className|varName).SubroutineName(expressionList) or it can be a subroutineName(ExpressionList)
+        elif (self.is_token_class() or self.is_token_var() or self.check_token(1, '<symbol> . </symbol>')
+                or (self.current_token[0:12] == '<identifier>' and self.check_token(1, '<symbol> ( </symbol>'))):
             self.og_compile_subroutine_call(sc)
 
         # the term is an (expression) -----------------------------------------
@@ -514,8 +554,8 @@ class JackCompiler:
         # end of (expression)--------------------------------------------------
 
         # the term is an unaryOp
-        elif self.current_token == '<symbol> - </symbol>':
-            # '-' : <symbol> - </symbol>
+        elif self.current_token == '<symbol> - </symbol>' or self.current_token == '<symbol> ~ </symbol>':
+            # '-' : <symbol> - or ~ </symbol>
             self.jack_array.append(' ' * sc + self.current_token)
 
             # term :
@@ -527,38 +567,74 @@ class JackCompiler:
         # END OF TERM----------------------------------
 
     def og_compile_subroutine_call(self, c_sc=0):
+        # Subroutine Name or Class Name|Var Name
         self.jack_array.append(' ' * c_sc + self.current_token)
 
-        # . : <symbol> . </symbol>
-        self.advance()
-        self.jack_array.append(' ' * c_sc + self.current_token)
-
-        # subroutineName : <identifier> new </identifier>
-        self.advance()
-        self.jack_array.append(' ' * c_sc + self.current_token)
-
-        # ( : <symbol> ( </symbol>
-        self.advance()
-        self.jack_array.append(' ' * c_sc + self.current_token)
-
-        # expressionList ------------------------------------
-        if self.check_token(1, '<symbol> ) </symbol>'):
-            self.compile_expression_list(c_sc)
-        else:
+        if self.check_token(1, '<symbol> ( </symbol>'):
+            # ( symbol
             self.advance()
-            self.compile_expression_list()
-        # /expressionList-----------------------------------
+            self.jack_array.append(' ' * c_sc + self.current_token)
 
-        # ) : <symbol> ) </symbol>
-        self.advance()
-        self.jack_array.append(' ' * c_sc + self.current_token)
-        # End of subroutineCall ---------------------------
+            # expressionList ------------------------------------
+            if self.check_token(1, '<symbol> ) </symbol>'):
+                self.compile_expression_list(c_sc)
+            else:
+                self.advance()
+                self.compile_expression_list(c_sc)
+            # /expressionList-----------------------------------
+
+            # ) symbol
+            self.advance()
+            self.jack_array.append(' ' * c_sc + self.current_token)
+
+        else:
+            # . : <symbol> . </symbol>
+            self.advance()
+            self.jack_array.append(' ' * c_sc + self.current_token)
+
+            # subroutineName : <identifier> new </identifier>
+            self.advance()
+            self.jack_array.append(' ' * c_sc + self.current_token)
+
+            # ( : <symbol> ( </symbol>
+            self.advance()
+            self.jack_array.append(' ' * c_sc + self.current_token)
+
+            # expressionList ------------------------------------
+            if self.check_token(1, '<symbol> ) </symbol>'):
+                self.compile_expression_list(c_sc)
+            else:
+                self.advance()
+                self.compile_expression_list(c_sc)
+            # /expressionList-----------------------------------
+
+            # ) : <symbol> ) </symbol>
+            self.advance()
+            self.jack_array.append(' ' * c_sc + self.current_token)
+
+    # End of subroutineCall ---------------------------
 
     def compile_expression_list(self, c_sc=0):
         self.jack_array.append(' ' * c_sc + '<expressionList>')  # <expressionList>
+        sc = c_sc + 2
 
-        if not self.check_token(1, '<symbol> ) </symbol>'):
-            print("Do a lot of stuffs here")
+        # The caller of this method is always choosing between entering '(' or the expression
+        # token itself. When current token is ( then there is no expression
+
+        # There is an expression
+        if not self.check_token(0, '<symbol> ( </symbol>'):
+            # expression Initial
+            self.compile_expression(sc)
+
+            # expression recursion
+            while self.check_token(1, '<symbol> , </symbol>'):
+                # , : <symbol> , </symbol>
+                self.advance()
+                self.jack_array.append(' ' * sc + self.current_token)
+
+                # expression
+                self.advance()
+                self.compile_expression(sc)
 
         # End of expression List
         self.jack_array.append(' ' * c_sc + '</expressionList>')  # </expressionList>
@@ -596,7 +672,7 @@ class JackCompiler:
 
 token_arrays = XMLReader(xml_directory).get_token_array()
 print(token_arrays[0])
-jack_array = JackCompiler(token_arrays[0])
+jack_array = JackCompiler(token_arrays[1])
 
 if jack_array.has_more_tokens():
     jack_array.advance()
