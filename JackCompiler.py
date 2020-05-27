@@ -190,31 +190,34 @@ class JackCompiler:
         self.jack_array.append(' ' * c_sc + '<parameterList>')  # <parameterList>
         is_comma = False    # Initialize for the while loop (different structure than standard)
         is_void = True  # this will be returned to say if there are any parameters or none
+        sc = c_sc + 2
 
         # Type or None at all: Initial
         if self.check_token(0, '<keyword> int </keyword>', '<keyword> char </keyword>',
                                '<keyword> boolean </keyword>') or self.is_token_class():
             is_void = False
             # type : <keyword> int </keyword>
-            self.jack_array.append(self.current_token)
+            self.jack_array.append(' ' * sc + self.current_token)
 
             # varName
             self.advance()
-            self.jack_array.append(self.current_token)
+            self.jack_array.append(' ' * sc + self.current_token)
+            self.var_names.append(self.current_token)
 
             # Repeating parameterList if applicable (will repeat if comma is found next)
             while self.check_token(1, '<symbol> , </symbol>'):
                 # , : <symbol> , </symbol>'
                 self.advance()
-                self.jack_array.append(self.current_token)
+                self.jack_array.append(' ' * sc + self.current_token)
 
                 # type : <keyword> int </keyword>
                 self.advance()
-                self.jack_array.append(self.current_token)
+                self.jack_array.append(' ' * sc + self.current_token)
 
                 # varName
                 self.advance()
-                self.jack_array.append(self.current_token)
+                self.jack_array.append(' ' * sc + self.current_token)
+                self.var_names.append(self.current_token)
 
         # End of ParameterList: </parameterList>
         self.jack_array.append(' ' * c_sc + '</parameterList>')
@@ -475,8 +478,8 @@ class JackCompiler:
 
         # (op term)* will keep repeating as long as there is a term----------
         is_op = self.check_token(1, '<symbol> + </symbol>', '<symbol> - </symbol>', '<symbol> * </symbol>',
-                                    '<symbol> / </symbol>', '<symbol> & </symbol>', '<symbol> | </symbol>',
-                                    '<symbol> < </symbol>', '<symbol> > </symbol>', '<symbol> = </symbol>')
+                                    '<symbol> / </symbol>', '<symbol> &amp; </symbol>', '<symbol> | </symbol>',
+                                    '<symbol> &lt; </symbol>', '<symbol> &gt; </symbol>', '<symbol> = </symbol>')
 
         while is_op:
             # op: <symbol> + or - or | something </symbol>
@@ -488,8 +491,8 @@ class JackCompiler:
             self.compile_term(sc)
 
             is_op = self.check_token(1, '<symbol> + </symbol>', '<symbol> - </symbol>', '<symbol> * </symbol>',
-                                        '<symbol> / </symbol>', '<symbol> & </symbol>', '<symbol> | </symbol>',
-                                        '<symbol> < </symbol>', '<symbol> > </symbol>', '<symbol> = </symbol>')
+                                        '<symbol> / </symbol>', '<symbol> &amp; </symbol>', '<symbol> | </symbol>',
+                                        '<symbol> &lt; </symbol>', '<symbol> &gt; </symbol>', '<symbol> = </symbol>')
 
         self.jack_array.append(' ' * c_sc + '</expression>')  # <Expression>
         # end of Expression---------------------------------------------------------
@@ -636,6 +639,21 @@ class JackCompiler:
                 self.advance()
                 self.compile_expression(sc)
 
+        # case of double or even more than tuple parenthesis
+        elif not self.check_token(1, '<symbol> ) </symbol>'):
+            # expression Initial
+            self.compile_expression(sc)
+
+            # expression recursion
+            while self.check_token(1, '<symbol> , </symbol>'):
+                # , : <symbol> , </symbol>
+                self.advance()
+                self.jack_array.append(' ' * sc + self.current_token)
+
+                # expression
+                self.advance()
+                self.compile_expression(sc)
+
         # End of expression List
         self.jack_array.append(' ' * c_sc + '</expressionList>')  # </expressionList>
         # End of Expression List-----------------------------------------------------------
@@ -672,7 +690,7 @@ class JackCompiler:
 
 token_arrays = XMLReader(xml_directory).get_token_array()
 print(token_arrays[0])
-jack_array = JackCompiler(token_arrays[1])
+jack_array = JackCompiler(token_arrays[2])
 
 if jack_array.has_more_tokens():
     jack_array.advance()
