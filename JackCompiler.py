@@ -13,37 +13,54 @@ class XMLReader:
     def __init__(self, token_file):
         self.xml_files = ["placeholder"]
         self.token_array = [];
+        self.xml_file_name = ['placeholder']
 
         xml_directories = glob.glob(token_file)
         for i, xml_add in enumerate(xml_directories):
             if xml_add[-5:] == 'T.xml':
-                if os.path.basename(xml_add) == "MainT.xml":
+                file_name = os.path.basename(xml_add)
+                if file_name == "MainT.xml":
                     self.xml_files[0] = xml_add
+                    self.xml_file_name[0] = (file_name[0:-5])
                 else:
                     self.xml_files.append(xml_add)
+                    self.xml_file_name.append(file_name[0:-5])
 
         for token_address in self.xml_files:
             temp_array = []
             token_file = open(token_address, 'r')
-            for token in token_file:
-                temp_array.append(token.strip())
+            for token_element in token_file:
+                temp_array.append(token_element.strip())
 
             self.token_array.append(temp_array)
 
     def get_token_array(self):
-        return self.token_array
+        token_file_name_tuple = []
+        for i, element in enumerate(self.token_array):
+            token_file_name_tuple.append((element, self.xml_file_name[i]))
+
+        return token_file_name_tuple
 
 
 class JackCompiler:
     """A jack Compiler Class"""
     def __init__(self, token_array):
-        self.token_array = token_array
+        self.token_array = token_array[0]
+        self.token_file_name = token_array[1]
         self.token_index = 0
         self.current_token = "placeholder"
         self.jack_array = []
         self.class_names = []
         self.subroutine_name = "placeholder"
         self.var_names = []
+
+        # Starts the compilation and makes sure the first token is a class
+        if self.has_more_tokens():
+            self.advance()
+            if self.current_token == '<keyword> class </keyword>':
+                self.compile_class()
+            else:
+                print("ERROR!!! A jack compiler must always have a class as it's first token!!!")
 
     def has_more_tokens(self):
         if self.token_array[self.token_index+1] == "</tokens>":
@@ -666,25 +683,23 @@ class JackCompiler:
     def get_jack_file(self):
         return self.jack_array
 
-    def make_jack_file(self, file_name):
+    def make_jack_file(self, f_file_name=''):
+        if f_file_name == '':
+            file_name = self.token_file_name + 'JackCompiled'
+        else:
+            file_name = f_file_name
+
         file = open(folder_directory + '/' + file_name + '.xml', 'w')
         for token_element in self.jack_array:
             file.write(token_element + '\n')
 
 
-token_arrays = XMLReader(xml_directory).get_token_array()
-print(token_arrays[0])
-jack_array = JackCompiler(token_arrays[0])
+xml = XMLReader(xml_directory)
+token_arrays = xml.get_token_array()
 
-if jack_array.has_more_tokens():
-    jack_array.advance()
+for tuple_element in token_arrays:
+    jack_array = JackCompiler(tuple_element)
+    jack_array.make_jack_file()
 
-    if jack_array.current_token == '<keyword> class </keyword>':
-        jack_array.compile_class()
 
-test_array = jack_array.get_jack_file()
 
-for token in test_array:
-    print(token)
-
-jack_array.make_jack_file('MainTest')
