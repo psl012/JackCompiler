@@ -579,11 +579,7 @@ class JackCompiler:
             self.jack_array.append(' ' * c_sc + self.current_token)
 
             # expressionList ------------------------------------
-            if self.check_token(1, '<symbol> ) </symbol>'):
-                self.compile_expression_list(c_sc)
-            else:
-                self.advance()
-                self.compile_expression_list(c_sc)
+            self.call_expression_list(c_sc)
             # /expressionList-----------------------------------
 
             # ) symbol
@@ -604,16 +600,19 @@ class JackCompiler:
             self.jack_array.append(' ' * c_sc + self.current_token)
 
             # expressionList ------------------------------------
-            if self.check_token(1, '<symbol> ) </symbol>'):
-                self.compile_expression_list(c_sc)
-            else:
-                self.advance()
-                self.compile_expression_list(c_sc)
+            self.call_expression_list(c_sc)
             # /expressionList-----------------------------------
 
             # ) : <symbol> ) </symbol>
             self.advance()
             self.jack_array.append(' ' * c_sc + self.current_token)
+
+    def call_expression_list(self, c_sc):
+        if self.check_token(1, '<symbol> ) </symbol>'):
+            self.compile_expression_list(c_sc)
+        else:
+            self.advance()
+            self.compile_expression_list(c_sc)
 
     # End of subroutineCall ---------------------------
 
@@ -625,22 +624,7 @@ class JackCompiler:
         # token itself. When current token is ( then there is no expression
 
         # There is an expression
-        if not self.check_token(0, '<symbol> ( </symbol>'):
-            # expression Initial
-            self.compile_expression(sc)
-
-            # expression recursion
-            while self.check_token(1, '<symbol> , </symbol>'):
-                # , : <symbol> , </symbol>
-                self.advance()
-                self.jack_array.append(' ' * sc + self.current_token)
-
-                # expression
-                self.advance()
-                self.compile_expression(sc)
-
-        # case of double or even more than tuple parenthesis
-        elif not self.check_token(1, '<symbol> ) </symbol>'):
+        if not self.check_token(0, '<symbol> ( </symbol>') or not self.check_token(1, '<symbol> ) </symbol>'):
             # expression Initial
             self.compile_expression(sc)
 
@@ -690,7 +674,7 @@ class JackCompiler:
 
 token_arrays = XMLReader(xml_directory).get_token_array()
 print(token_arrays[0])
-jack_array = JackCompiler(token_arrays[2])
+jack_array = JackCompiler(token_arrays[0])
 
 if jack_array.has_more_tokens():
     jack_array.advance()
